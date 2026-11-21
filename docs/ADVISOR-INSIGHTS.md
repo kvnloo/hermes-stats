@@ -16,7 +16,7 @@ The Insights page, the Overview banner and `/stats` follow this review. A second
 - Every detector reports a check: found, fine or waiting for data. A fresh install sees why the page is empty.
 - Unpriced requests get a note, and the note says every dollar figure leaves them out.
 - Dollar figures say "API-equivalent" everywhere. No finding says "save".
-- Narration uses slots. The model writes `{side-tasks.cost}` and the code fills in `$28.77`. A slot carries its unit, so a model that writes `{x.calls}%` fails the check.
+- Narration uses slots. The model writes `{side-tasks.cost}` and the code fills in `$12.40`. A slot carries its unit, so a model that writes `{x.calls}%` fails the check.
 - The comparison guard is in. Phrases such as "last week", "week over week" and "than usual" fail the check, because the input holds no earlier period.
 - Failure is closed. An unverified reply keeps only the rejected figures, never the model's text, so no client can show it.
 - Narration is opt-in. `hermes stats insights` and `/stats` never call a model. They show a cached summary when one exists. The page has a **Write a summary** button, and `hermes stats snapshot FILE --narrate` precomputes summaries for a snapshot.
