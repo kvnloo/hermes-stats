@@ -1,0 +1,10 @@
+Hermes Stats
+Copyright (C) 2026 Kevin Rajan. Licensed under the GNU General Public License v3.0 only (see LICENSE).
+
+Third-party components, each under its own license:
+- Dashboard client (stats/src, stats/build.ts), forked from Oh My Pi packages/stats,
+  https://github.com/can1357/oh-my-pi, Copyright (c) 2025-2026 Can Bölük and (c) 2026 Stencil Labs, Inc.,
+  MIT License (stats/LICENSE). Bundled into stats/dist with React and React DOM (MIT, Meta Platforms)
+  and lucide-react (ISC, Lucide Contributors).
+- Instrument Serif (assets/fonts/InstrumentSerif-Italic.ttf), The Instrument Serif Project Authors,
+  SIL Open Font License 1.1 (assets/fonts/OFL-InstrumentSerif.txt). Inlined into stats/dist/index.css.

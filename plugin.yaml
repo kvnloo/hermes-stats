@@ -1,0 +1,18 @@
+name: stats
+version: "0.1.0"
+manifest_version: 2
+description: >-
+  Hermes Stats: the Oh My Pi `omp stats` dashboard over your Hermes session stores and z0live voice
+  traces. Overview, models, providers, costs, requests, errors, traces, tools and an Insights page
+  with "what to change" findings. `hermes stats serve` runs it on 127.0.0.1, `hermes stats snapshot
+  FILE` writes one offline HTML page, and `/stats [24h|7d|30d|90d|all]` answers in chat. Read-only
+  and metadata-only: it never reads message text, and it calls a model only when you ask for a summary.
+author: Kevin Rajan
+license: GPL-3.0-only
+homepage: https://github.com/kvnloo/hermes-stats
+tags: [stats, analytics, dashboard, usage, costs]
+requires_hermes: ">=0.22.0"
+# Registers the /stats slash command, the `hermes stats` CLI command and the `stats_insights`
+# auxiliary task. No agent tools, no hooks, no middleware.
+provides_tools: []
+provides_hooks: []
