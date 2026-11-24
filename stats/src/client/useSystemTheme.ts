@@ -10,7 +10,8 @@ const DARK_SCHEME_QUERY = "(prefers-color-scheme: dark)";
 function readStoredPreference(): ThemePreference {
 	if (typeof localStorage === "undefined") return "light";
 	const stored = localStorage.getItem(STORAGE_KEY);
-	return stored === "light" || stored === "dark" || stored === "system" ? stored : "light";
+	// Unset follows the device, so a phone in dark mode gets the night palette.
+	return stored === "light" || stored === "dark" ? stored : "system";
 }
 
 function getSystemTheme(): SystemTheme {

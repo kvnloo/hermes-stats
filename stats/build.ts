@@ -43,7 +43,7 @@ const indexHtml = `<!DOCTYPE html>
         try {
           var stored = localStorage.getItem("hermes-stats-theme");
           var system = matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
-          var theme = stored === "dark" || stored === "light" ? stored : stored === "system" ? system : "light";
+          var theme = stored === "dark" || stored === "light" ? stored : system;
           document.documentElement.dataset.theme = theme;
           document.documentElement.style.colorScheme = theme;
         } catch (e) {}
