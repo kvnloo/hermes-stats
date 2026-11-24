@@ -233,6 +233,13 @@ class InsightsTest(unittest.TestCase):
         self.assertNotIn("summary", out)  # the model's text never leaves the gate
         self.assertNotIn("actions", out)
 
+    def test_slots_fill_for_ids_named_after_real_models(self):
+        # Model and provider names carry brackets and slashes (claude-opus-5-5[1m], openrouter/x).
+        fid = "turns-error-m[1m]-a/b"
+        payload = {"findings": [{"id": fid, "evidence": [{"key": "events", "value": 3, "unit": "count"}]}]}
+        self.assertEqual(stats_narrate.verify("{%s.events} turns failed." % fid, payload), ("3 turns failed.", []))
+        self.assertEqual(stats_narrate.verify("{%s.nope} failed." % fid, payload)[1], ["{%s.nope}" % fid])
+
     def test_derived_numbers_unknown_slots_ids_and_comparisons_fail(self):
         cases = {
             "Subagents and side tasks cost $36.10 together.": "36.10",  # a sum the model computed

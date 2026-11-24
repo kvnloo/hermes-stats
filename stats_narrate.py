@@ -158,7 +158,9 @@ def format_value(value: float, unit: str) -> str:
 
 # A slot with the unit the model typed around it: "${x.cost}", "{x.share}%", "{x.hours} hours". The
 # value already carries its unit, so a matching one is absorbed and a conflicting one is rejected.
-_SLOT = re.compile(r"(\$?)\{([A-Za-z0-9_.:-]+)\}(%|\s+(?:hours?|seconds?|percent)\b)?")
+# A slot name is anything but braces and spaces: finding ids carry model names such as
+# claude-opus-5-5[1m] or openrouter/x, and a name the table lacks must be flagged, not left as text.
+_SLOT = re.compile(r"(\$?)\{([^{}\s]+)\}(%|\s+(?:hours?|seconds?|percent)\b)?")
 _UNIT_END = {"%": "%", "hour": "h", "hours": "h", "second": "s", "seconds": "s", "percent": "%"}
 # The payload holds no earlier period, so any comparison with one is invented.
 _COMPARISON = re.compile(r"\b(?:last|previous|prior) (?:week|month|period|year)\b|\bweek[- ]over[- ]week\b"
