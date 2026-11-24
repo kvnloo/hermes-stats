@@ -105,9 +105,11 @@ export function LiveProvider({ children }: { children: ReactNode }) {
 			emit();
 			return;
 		}
-		const source = new EventSource("/api/events");
+		const source = new EventSource(api.scoped("api/events"));
 		source.onopen = () => setConnected(true);
-		source.onerror = () => setConnected(false);
+		// The dashboard tab answers one event per request and the browser reconnects; only a
+		// stream the browser gave up on is a lost connection.
+		source.onerror = () => setConnected(source.readyState !== EventSource.CLOSED);
 		source.onmessage = event => receive(JSON.parse(event.data) as LiveStatus);
 		return () => {
 			source.close();

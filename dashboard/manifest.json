@@ -1,0 +1,10 @@
+{
+  "name": "stats",
+  "label": "Stats",
+  "description": "Hermes Stats: usage, costs, errors, traces and what to change, with an optional model-written summary.",
+  "icon": "BarChart3",
+  "version": "0.2.0",
+  "tab": { "path": "/stats", "position": "after:analytics" },
+  "entry": "dist/index.js",
+  "api": "plugin_api.py"
+}

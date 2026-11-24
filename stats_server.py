@@ -125,6 +125,66 @@ def default_cache() -> stats_narrate.Cache:
     return stats_narrate.Cache(data_dir() / "insights-cache")
 
 
+@dataclass(frozen=True)
+class App:
+    """What every API request needs. `llm` None: the summary and the Ask box say no model is set."""
+    source: Source
+    llm: stats_narrate.Llm | None
+    cache: stats_narrate.Cache
+
+
+def _range(query: str) -> str:
+    return parse_qs(query).get("range", ["7d"])[0]
+
+
+def get_api(app: App, path: str, query: str) -> tuple[int, Any]:
+    """(status, JSON payload) for one GET under /api/, shared by `serve` and the dashboard tab."""
+    if path == "/api/status":
+        return 200, app.source.status()
+    models = app.source.current()
+    now = int(time.time() * 1000)
+    try:
+        if path == "/api/stats/insights":
+            return 200, insights(models, _range(query), now)[0]
+        if path == "/api/insights/narrative":
+            payload = insights(models, _range(query), now)[1]
+            return 200, stats_narrate.narrate(payload, app.llm, app.cache, cached_only=True)
+        return 200, stats_api.route(path, query, models.hermes, models.voice, now)
+    except stats_api.NotFound as exc:
+        return 404, {"error": str(exc)}
+    except stats_api.BadRequest as exc:
+        return 400, {"error": str(exc)}
+
+
+def post_api(app: App, path: str, query: str, content_type: str, raw: bytes) -> tuple[int, Any]:
+    """(status, JSON payload) for one POST under /api/. Only these spend tokens; callers check Origin."""
+    if path == "/api/sync":
+        return 200, app.source.status()
+    if path not in ("/api/insights/narrative", "/api/insights/ask"):
+        return 404, {"error": "Not found."}
+    if content_type.split(";")[0].strip() != "application/json":
+        return 415, {"error": "Send JSON."}
+    if len(raw) > MAX_BODY:
+        return 413, {"error": "Request too large."}
+    try:
+        body = json.loads(raw or b"{}")
+    except ValueError:
+        return 400, {"error": "Body is not JSON."}
+    if not isinstance(body, dict):
+        return 400, {"error": "Body must be a JSON object."}
+    range_name = body.get("range") if isinstance(body.get("range"), str) else _range(query)
+    try:
+        payload = insights(app.source.current(), range_name, int(time.time() * 1000))[1]
+    except stats_api.BadRequest as exc:
+        return 400, {"error": str(exc)}
+    if path == "/api/insights/narrative":
+        return 200, stats_narrate.narrate(payload, app.llm, app.cache)
+    question = body.get("question")
+    if not isinstance(question, str):
+        return 400, {"error": "question is required."}
+    return 200, stats_narrate.ask(payload, question, app.llm, app.cache)
+
+
 class Handler(BaseHTTPRequestHandler):
     server: "StatsServer"  # pyright: ignore[reportIncompatibleVariableOverride]
     protocol_version = "HTTP/1.1"
@@ -156,28 +216,10 @@ class Handler(BaseHTTPRequestHandler):
         if not self._host_ok():
             return self._json(421, {"error": "Unknown host."})
         url = urlsplit(self.path)
-        source = self.server.source
         if url.path == "/api/events":
             return self._events()
-        if url.path == "/api/status":
-            return self._json(200, source.status())
         if url.path.startswith("/api/"):
-            models = source.current()
-            now = int(time.time() * 1000)
-            try:
-                if url.path == "/api/stats/insights":
-                    payload: Any = insights(models, self._range(url.query), now)[0]
-                elif url.path == "/api/insights/narrative":
-                    report_payload = insights(models, self._range(url.query), now)[1]
-                    payload = stats_narrate.narrate(report_payload, self.server.llm, self.server.cache,
-                                                    cached_only=True)
-                else:
-                    payload = stats_api.route(url.path, url.query, models.hermes, models.voice, now)
-            except stats_api.NotFound as exc:
-                return self._json(404, {"error": str(exc)})
-            except stats_api.BadRequest as exc:
-                return self._json(400, {"error": str(exc)})
-            return self._json(200, payload)
+            return self._json(*get_api(self.server.app, url.path, url.query))
         asset = ASSETS.get(url.path)
         if asset is None:
             return self._json(404, {"error": "Not found."})
@@ -189,10 +231,6 @@ class Handler(BaseHTTPRequestHandler):
 
     do_HEAD = do_GET
 
-    @staticmethod
-    def _range(query: str) -> str:
-        return parse_qs(query).get("range", ["7d"])[0]
-
     def _origin_ok(self) -> bool:
         """A browser POST from another site carries its Origin; only this dashboard's own may spend tokens."""
         origin = self.headers.get("Origin")
@@ -203,36 +241,14 @@ class Handler(BaseHTTPRequestHandler):
         if not self._host_ok():
             return self._json(421, {"error": "Unknown host."})
         url = urlsplit(self.path)
-        if url.path == "/api/sync":
-            return self._json(200, self.server.source.status())
-        if url.path not in ("/api/insights/narrative", "/api/insights/ask"):
-            return self._json(404, {"error": "Not found."})
         # A cross-site form cannot send JSON without a CORS preflight, which this server never grants.
         if not self._origin_ok():
             return self._json(403, {"error": "Cross-origin request refused."})
-        if (self.headers.get("Content-Type") or "").split(";")[0].strip() != "application/json":
-            return self._json(415, {"error": "Send JSON."})
         length = int(self.headers.get("Content-Length") or 0)
         if not 0 <= length <= MAX_BODY:
             return self._json(413, {"error": "Request too large."})
-        try:
-            body = json.loads(self.rfile.read(length) or b"{}")
-        except ValueError:
-            return self._json(400, {"error": "Body is not JSON."})
-        if not isinstance(body, dict):
-            return self._json(400, {"error": "Body must be a JSON object."})
-        range_name = body.get("range") if isinstance(body.get("range"), str) else self._range(url.query)
-        try:
-            payload = insights(self.server.source.current(), range_name, int(time.time() * 1000))[1]
-        except stats_api.BadRequest as exc:
-            return self._json(400, {"error": str(exc)})
-        server = self.server
-        if url.path == "/api/insights/narrative":
-            return self._json(200, stats_narrate.narrate(payload, server.llm, server.cache))
-        question = body.get("question")
-        if not isinstance(question, str):
-            return self._json(400, {"error": "question is required."})
-        self._json(200, stats_narrate.ask(payload, question, server.llm, server.cache))
+        self._json(*post_api(self.server.app, url.path, url.query, self.headers.get("Content-Type") or "",
+                             self.rfile.read(length)))
 
     def _events(self) -> None:
         self.send_response(200)
@@ -243,7 +259,7 @@ class Handler(BaseHTTPRequestHandler):
         self.close_connection = True
         try:
             while not self.server.stopping.is_set():
-                self.wfile.write(b"data: " + _dumps(self.server.source.status()) + b"\n\n")
+                self.wfile.write(b"data: " + _dumps(self.server.app.source.status()) + b"\n\n")
                 self.wfile.flush()
                 self.server.stopping.wait(POLL_S)
         except (BrokenPipeError, ConnectionResetError):
@@ -256,9 +272,7 @@ class StatsServer(ThreadingHTTPServer):
     def __init__(self, address: tuple[str, int], source: Source, llm: stats_narrate.Llm | None = None,
                  cache: stats_narrate.Cache | None = None) -> None:
         super().__init__(address, Handler)
-        self.source = source
-        self.llm = llm  # None: the narrative and the ask box say no model is configured
-        self.cache = cache or stats_narrate.Cache(None)
+        self.app = App(source, llm, cache or stats_narrate.Cache(None))
         self.stopping = threading.Event()
         self.hosts = LOOPBACK
 

@@ -17,6 +17,8 @@ hermes plugins install kvnloo/hermes-stats
 hermes stats serve            # then open http://127.0.0.1:8800/
 ```
 
+The plugin also adds a **Stats** tab to `hermes dashboard` (after Analytics). The tab serves the same page and API from `/api/plugins/stats/`. After installing, run `curl http://127.0.0.1:9119/api/dashboard/plugins/rescan` or restart the dashboard. The tab loads the page in a frame, so it needs a dashboard that signs you in with a cookie, which is any dashboard behind a login. A loopback-only dashboard authenticates with a header that a frame can't send, so use `hermes stats serve` there.
+
 It needs Hermes 0.22.0 or newer and nothing else at runtime. The plugin is standard-library Python, and the dashboard client ships prebuilt in `stats/dist`, so there is no Node, Bun or npm step.
 
 ## Use

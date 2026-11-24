@@ -19,7 +19,19 @@ import type {
 	VoiceFrustrationStats,
 } from "./types";
 
-const API_BASE = "/api";
+const API_BASE = "api";
+
+/**
+ * Every request is relative to the page, so the client works at `/` under `hermes stats serve` and at
+ * `/api/plugins/stats/` as a Hermes dashboard tab. The dashboard scopes a request to a profile with
+ * `?profile=`; the page forwards its own.
+ */
+const PROFILE = new URLSearchParams(window.location.search).get("profile");
+
+export function scoped(endpoint: string): string {
+	if (!PROFILE) return endpoint;
+	return `${endpoint}${endpoint.includes("?") ? "&" : "?"}profile=${encodeURIComponent(PROFILE)}`;
+}
 
 export class ApiError extends Error {
 	status: number;
@@ -72,7 +84,7 @@ async function fetchJson<T>(endpoint: string, options?: RequestInit, previous?: 
 		headers.set("If-None-Match", etag);
 		init = { ...options, headers };
 	}
-	const res = await fetch(endpoint, init);
+	const res = await fetch(scoped(endpoint), init);
 	if (res.status === 304 && etag) return previous as T;
 	if (!res.ok) {
 		throw new ApiError(res.status, endpoint, await readErrorMessage(res, endpoint));
@@ -168,7 +180,7 @@ export async function getNarrative(range: TimeRange = "7d", signal?: AbortSignal
 /** Live server only: send the aggregates and findings to the configured model. */
 async function postJson<T>(endpoint: string, body: unknown): Promise<T> {
 	if (SNAPSHOT) throw new ApiError(405, endpoint, "This snapshot is read-only. Run `hermes stats serve` to ask.");
-	const res = await fetch(endpoint, {
+	const res = await fetch(scoped(endpoint), {
 		method: "POST",
 		headers: { "Content-Type": "application/json" },
 		body: JSON.stringify(body),
